@@ -9,6 +9,16 @@ import { resolveRegionUserDataDirName } from '../regionUserData';
 describe('resolveRegionUserDataDirName', () => {
   const ARGV = ['Cindy.exe'] as const;
 
+  // 用户同时安装原版与 ReClaude 版，两者的历史记录和设置分别保存。
+  it('独立 ReClaude 安装包使用自己的资料目录，原版保持原目录', () => {
+    expect(resolveRegionUserDataDirName({
+      isPackaged: true, region: 'global', argv: ARGV, reclaude: true,
+    })).toBe('CindyReClaude');
+    expect(resolveRegionUserDataDirName({
+      isPackaged: true, region: 'global', argv: ARGV,
+    })).toBe('CindyGlobal');
+  });
+
   it('packaged + global → 覆写为 CindyGlobal(与 cn 分库)', () => {
     expect(
       resolveRegionUserDataDirName({ isPackaged: true, region: 'global', argv: ARGV }),

@@ -9,7 +9,7 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
 import { exit, stderr } from 'node:process';
 import { BRAND_IDENTITY } from '@cindy/maker-shared/brand-identity';
 import { refreshBrowserRuntimeConfigDir } from '@cindy/browser-control-runtime/config-dir';
-import { CURRENT_CINDY_REGION } from '../shared/brandRegion.js';
+import { CURRENT_CINDY_REGION, IS_RECLAUDE_BUILD } from '../shared/brandRegion.js';
 import { resolveRegionUserDataDirName } from './regionUserData.js';
 import { createLogger, initLogger } from './logger.js';
 import { beginDesktopDevInstance, type DesktopDevMode } from './devStartupStatus.js';
@@ -40,10 +40,12 @@ const regionUserDataDirName = resolveRegionUserDataDirName({
   region: CURRENT_CINDY_REGION,
   argv: process.argv,
   envUserDataDir: process.env.XDT_USER_DATA_DIR,
+  reclaude: IS_RECLAUDE_BUILD,
 });
 if (regionUserDataDirName) {
   app.setPath('userData', path.join(app.getPath('appData'), regionUserDataDirName));
 }
+if (app.isPackaged && IS_RECLAUDE_BUILD) app.setName('Cindy ReClaude');
 // A verified version handoff retains the launching original's profile and keychain identity.
 prepareCindyVersionStartup();
 
@@ -67,6 +69,9 @@ log.debug(`[fix-path] after PATH=${process.env.PATH ?? ''}`);
 // read at authManager's module top, crashed the whole app on launch (0.1.14).
 // Must run before bootstrap-electron (and thus authManager) is imported below.
 ensureSystemBinPathForMachineId();
+if (app.isPackaged && IS_RECLAUDE_BUILD) {
+  process.env.XDT_DEVICE_ID_OVERRIDE = `reclaude-${machineIdSync().slice(0, 55)}`;
+}
 
 // !! 必须在 dispatch() 之前同步执行 !!
 // 把用户系统(HKCU / shell rc)注入到本进程 process.env 上的 Anthropic / Claude Code
