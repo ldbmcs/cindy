@@ -92,7 +92,7 @@ import {
 import { CLAUDE_PROVIDER_AUTH_PLACEHOLDER_KEY, isAnthropicWireModel } from './claude-gateway-config.js';
 import { hasClaudeNativeLogin } from './claude-native-auth.js';
 import { disconnectClaudeNativeLogin, readClaudeNativeLogin } from './claude-native-connection.js';
-import { claudeCliNetworkEnv } from './claude-native-cli.js';
+import { claudeCliNetworkEnv, reclaudeValidationBinaryPath } from './claude-native-cli.js';
 import { ensureLegacyClaudeConfigMigrated } from './claude-legacy-config-migration.js';
 import { isAnthropicCompatProxyHandleReady } from './anthropic-compat-proxy-host.js';
 import { claudeUpstreamEndpoint } from './runtime-configs.js';
@@ -585,6 +585,7 @@ export class DesktopClaudeAuthAdapter implements AuthAdapter {
   }
 
   async ensureSharedGlobalSkills(): Promise<void> {
+    if (reclaudeValidationBinaryPath()) return;
     const scope = preparationScope();
     // The opt-in setting and root listings are part of the key so a cached completion
     // never hides a crossAgentSyncEnabled toggle or an added/removed global skill.
@@ -738,7 +739,7 @@ export class DesktopClaudeAuthAdapter implements AuthAdapter {
     // 所有来源都用 CLI 默认配置目录(dev 多实例与正式版一致,不设 CLAUDE_CONFIG_DIR):
     // 订阅会话的凭证库按配置目录区分,隔离会看不到本机已有的 Claude Code 登录。
     // 旧版 dev 隔离在 <userData>/claude-home 的转录,拉起 CLI 前补拷到默认目录供 resume。
-    await ensureLegacyClaudeConfigMigrated();
+    if (!reclaudeValidationBinaryPath()) await ensureLegacyClaudeConfigMigrated();
     return env;
   }
 

@@ -83,6 +83,7 @@ export const PACKAGED_APP_NAME_BY_REGION = Object.freeze({
 });
 
 export function packagedAppName(region = 'global') {
+  if (process.env.CINDY_RECLAUDE_BUILD === '1') return 'Cindy ReClaude';
   const name = PACKAGED_APP_NAME_BY_REGION[region];
   if (!name) throw new Error(`unknown region: ${region}`);
   return name;

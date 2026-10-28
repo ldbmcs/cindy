@@ -993,6 +993,7 @@ function devEnvEntries(env) {
     ['XDT_SCHEDULER_PASSIVE', env.XDT_SCHEDULER_PASSIVE],
     ['XDT_ISOLATED', env.XDT_ISOLATED],
     ['XDT_ISOLATED_NAME', env.XDT_ISOLATED_NAME],
+    ['CINDY_RECLAUDE_EXECUTABLE', env.CINDY_RECLAUDE_EXECUTABLE],
     // --mock 的 UI 模拟数据开关(main/index.ts 只在隔离沙箱里认)。
     ['XDT_UI_MOCK', env.XDT_UI_MOCK],
     // Cindy Make 测试窗口标记必须穿过 restart → dev-env → Forge，

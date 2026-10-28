@@ -96,7 +96,9 @@ const CINDY_REGION = resolveCindyRegion(
 // process.env):防止「只设 CINDY_AUTH_REGION 直跑 forge」时 NSIS appId 用
 // global 而 main 烘焙的 CURRENT_APP_ID 落回 cn——AUMID 漂移 = toast 静默丢失。
 process.env.VITE_CINDY_AUTH_REGION = CINDY_REGION;
-const CINDY_APP_ID = brandAppId(CINDY_REGION);
+const RECLAUDE_BUILD = process.env.CINDY_RECLAUDE_BUILD === '1';
+process.env.VITE_CINDY_RECLAUDE_BUILD = RECLAUDE_BUILD ? '1' : '';
+const CINDY_APP_ID = RECLAUDE_BUILD ? 'io.github.ldbmcs.cindy-reclaude' : brandAppId(CINDY_REGION);
 const CINDY_UTI_PREFIX = brandBundleIdPrefix(CINDY_REGION);
 /**
  * 可执行文件基名,按区域派生(cn/global 同值 'Cindy',dev 'CindyDev';
@@ -105,7 +107,7 @@ const CINDY_UTI_PREFIX = brandBundleIdPrefix(CINDY_REGION);
  * 入口按同一区域切换(src/main/regionUserData.ts),两端从 brand-identity
  * 同源派生,cn/global 数据仍分库。
  */
-const CINDY_EXE = brandExecutableName(CINDY_REGION);
+const CINDY_EXE = RECLAUDE_BUILD ? 'Cindy ReClaude' : brandExecutableName(CINDY_REGION);
 /** 更新器二进制文件名(cindy-updater.exe)。 */
 const UPDATER_EXE = `${BRAND_IDENTITY.updaterName}.exe`;
 
@@ -709,18 +711,19 @@ function applyMacPackagedDisplayName(buildPath: string, platform: string): void 
     // 否则 Electron 找不到 Helper app(见函数头 ⚠️)。
     const key = 'CFBundleDisplayName';
     // packager 必写该键,Set 即可;Add 兜底防未来 packager 行为变化。
-    const set = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Set :${key} Cindy`, plistPath]);
+    const displayName = RECLAUDE_BUILD ? CINDY_EXE : BRAND_IDENTITY.displayName;
+    const set = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${displayName}`, plistPath]);
     if (set.status !== 0) {
       const add = spawnSync('/usr/libexec/PlistBuddy', [
         '-c',
-        `Add :${key} string Cindy`,
+        `Add :${key} string ${displayName}`,
         plistPath,
       ]);
       if (add.status !== 0) {
         throw new Error(`[forge:postPackage] PlistBuddy failed to set ${key} in ${plistPath}`);
       }
     }
-    console.log(`[forge:postPackage] mac display name → Cindy (${appDir}/Contents/Info.plist)`);
+    console.log(`[forge:postPackage] mac display name → ${displayName} (${appDir}/Contents/Info.plist)`);
   }
 }
 

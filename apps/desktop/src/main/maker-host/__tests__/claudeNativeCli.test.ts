@@ -7,6 +7,8 @@ import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
+  packaged: true,
+  reclaudeBuild: false,
   binary: '/opt/cindy/claude' as string | null,
   envProxy: false,
   resolved: null as string | null,
@@ -15,7 +17,9 @@ const h = vi.hoisted(() => ({
   spawn: vi.fn(),
 }));
 
-vi.mock('electron', () => ({ app: { isPackaged: true, getPath: () => '/tmp/cindy-test-user-data' } }));
+vi.mock('electron', () => ({ app: { get isPackaged() { return h.packaged; }, getPath: () => '/tmp/cindy-test-user-data' } }));
+vi.mock('../../../shared/brandRegion.js', () => ({ get IS_RECLAUDE_BUILD() { return h.reclaudeBuild; } }));
+vi.mock('node:os', () => ({ default: { homedir: () => '/home/test-user' } }));
 vi.mock('@cindy/maker-core', () => ({ cleanProcessEnv: () => ({ PATH: '/usr/bin' }) }));
 vi.mock('../../agent-binaries/index.js', () => ({ getReadyBinaryPath: () => h.binary }));
 vi.mock('../../logger.js', () => ({
@@ -84,6 +88,9 @@ function argsOf(call: unknown[]): string[] {
 }
 
 beforeEach(() => {
+  vi.unstubAllEnvs();
+  h.packaged = true;
+  h.reclaudeBuild = false;
   resetClaudeNativeCliForTest();
   h.binary = '/opt/cindy/claude';
   h.envProxy = false;
@@ -167,6 +174,36 @@ describe('claudeCliNetworkEnv', () => {
 });
 
 describe('登录态读取', () => {
+  // 用户从 Finder 打开独立 App，没有终端环境变量，也能检查本机 ReClaude 登录。
+  it('独立安装包无需终端配置即可使用当前用户的 ReClaude', async () => {
+    h.reclaudeBuild = true;
+    h.spawn.mockImplementation(() => fakeChild({ stdout: SUBSCRIPTION }));
+    await expect(refreshClaudeCliLoginStatus()).resolves.toMatchObject({ loggedIn: true });
+    expect(h.spawn.mock.calls[0][0]).toBe('/home/test-user/.local/bin/reclaude');
+    expect(argsOf(h.spawn.mock.calls[0])).toEqual(['auth', 'status', '--json']);
+    await expect(claudeCliNetworkEnv()).resolves.toEqual({});
+    expect(h.bridge).not.toHaveBeenCalled();
+  });
+
+  // 验证版必须读取所选 ReClaude 的真实状态；正式版或非隔离进程不受该设置影响。
+  it.each([
+    [false, '1', '/opt/reclaude'],
+    [true, '1', '/opt/cindy/claude'],
+    [false, '0', '/opt/cindy/claude'],
+  ])('隔离验证启动只更换真实登录检查的程序', async (packaged, isolated, expectedBinary) => {
+    h.packaged = packaged;
+    vi.stubEnv('XDT_ISOLATED', isolated);
+    vi.stubEnv('CINDY_RECLAUDE_EXECUTABLE', '/opt/reclaude');
+    h.spawn.mockImplementation(() => fakeChild({ stdout: SUBSCRIPTION }));
+    await expect(refreshClaudeCliLoginStatus()).resolves.toMatchObject({ loggedIn: true });
+    expect(h.spawn.mock.calls[0][0]).toBe(expectedBinary);
+    expect(argsOf(h.spawn.mock.calls[0])).toEqual(['auth', 'status', '--json']);
+    if (!packaged && isolated === '1') {
+      h.resolved = 'socks5://127.0.0.1:7891';
+      await expect(claudeCliNetworkEnv()).resolves.toEqual({});
+      expect(h.bridge).not.toHaveBeenCalled();
+    }
+  });
   it('读失败后退避,期间不再反复拉起 CLI;force 绕过退避', async () => {
     h.spawn.mockImplementation(() => fakeChild({ error: new Error('ENOENT') }));
     await expect(refreshClaudeCliLoginStatus()).resolves.toEqual({ loggedIn: false });

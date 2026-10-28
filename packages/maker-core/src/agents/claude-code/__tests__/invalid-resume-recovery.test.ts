@@ -144,6 +144,7 @@ async function seedTranscript(configDir: string, workingDir: string, sdkSessionI
 }
 
 async function startHarness(args: {
+  binaryPath?: string;
   resumeSessionId?: string;
   transcriptExists: boolean;
   onInvalidResumeSession: StartSessionOptions['onInvalidResumeSession'];
@@ -182,7 +183,7 @@ async function startHarness(args: {
     return queries[index];
   });
 
-  const deps = createDeps();
+  const deps = createDeps(args.binaryPath ? { binaryPath: args.binaryPath } : {});
   const debug = vi.spyOn(deps.logger!, 'debug');
   const agent = new ClaudeCodeAgent(deps);
   const handle = await agent.startSession({
@@ -440,6 +441,22 @@ describe('Claude invalid-resume recovery', () => {
     expect(clear).not.toHaveBeenCalled();
     await h.handle.close();
     for (const stream of h.streams) stream.end();
+    await h.collected;
+  });
+
+  // 用户重开 ReClaude 任务，默认 Claude 目录没有记录时仍交给 ReClaude 恢复历史。
+  it('preserves the ReClaude conversation when its transcript is outside the default directory', async () => {
+    const clear = vi.fn(async () => true);
+    const h = await startHarness({
+      binaryPath: '/opt/reclaude',
+      resumeSessionId: 'sdk-reclaude',
+      transcriptExists: false,
+      onInvalidResumeSession: clear,
+    });
+    expect(h.queryOptions[0].resume).toBe('sdk-reclaude');
+    expect(clear).not.toHaveBeenCalled();
+    await h.handle.close();
+    h.streams[0].end();
     await h.collected;
   });
 

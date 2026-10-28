@@ -15,12 +15,16 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import { app } from 'electron';
 
 import { cleanProcessEnv } from '@cindy/maker-core';
 import { hasProxyEnvConfig, parseOutboundProxyUrl } from '@cindy/anthropic-compat-proxy';
 
 import { getReadyBinaryPath } from '../agent-binaries/index.js';
 import { createLogger } from '../logger.js';
+import { IS_RECLAUDE_BUILD } from '../../shared/brandRegion.js';
 import { resolveDesktopOutboundProxy } from './outbound-proxy-resolver.js';
 import { ensureClaudeCliProxyBridge } from './claude-cli-proxy-bridge.js';
 import {
@@ -51,6 +55,13 @@ const ANTHROPIC_API_ORIGIN = 'https://api.anthropic.com';
 
 const LOOPBACK_NO_PROXY = 'localhost,127.0.0.1,::1';
 
+export function reclaudeValidationBinaryPath(): string | undefined {
+  if (IS_RECLAUDE_BUILD) return path.join(os.homedir(), '.local', 'bin', 'reclaude');
+  return !app.isPackaged && process.env.XDT_ISOLATED === '1'
+    ? process.env.CINDY_RECLAUDE_EXECUTABLE
+    : undefined;
+}
+
 /**
  * 让 CLI 走用户的代理。CLI 只认 HTTPS_PROXY 环境变量、不读系统代理 / PAC,也不支持
  * SOCKS;GUI 启动的 Cindy 拿不到 shell env,开「系统代理」模式的用户直连会失败。
@@ -65,6 +76,7 @@ const LOOPBACK_NO_PROXY = 'localhost,127.0.0.1,::1';
  * HTTPS 经代理走 CONNECT 隧道,TLS 端到端,代理、桥与 Cindy 都看不到凭证。
  */
 export async function claudeCliNetworkEnv(): Promise<Record<string, string>> {
+  if (reclaudeValidationBinaryPath()) return {};
   const fromEnv = hasProxyEnvConfig();
   let raw: string | null | undefined = null;
   try {
@@ -89,7 +101,7 @@ export async function claudeCliNetworkEnv(): Promise<Record<string, string>> {
 }
 
 function cliBinaryPath(): string | null {
-  return getReadyBinaryPath('claude-code') ?? null;
+  return reclaudeValidationBinaryPath() ?? getReadyBinaryPath('claude-code') ?? null;
 }
 
 /**

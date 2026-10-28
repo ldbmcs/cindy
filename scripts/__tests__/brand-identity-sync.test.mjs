@@ -39,6 +39,21 @@ const USER_DATA_DIR_NAME = extractLiteral(
   /userDataDirName:\s*'([^']+)'/,
   'brandIdentity.ts userDataDirName',
 );
+
+// 用户打包独立版本时，产物与验收入口使用同一应用名称。
+test('ReClaude build resolves its own packaged app name without changing the official build', async () => {
+  const { packagedAppName } = await import('../../apps/desktop/scripts/ci/lib.mjs');
+  const previous = process.env.CINDY_RECLAUDE_BUILD;
+  try {
+    process.env.CINDY_RECLAUDE_BUILD = '1';
+    assert.equal(packagedAppName('global'), 'Cindy ReClaude');
+    delete process.env.CINDY_RECLAUDE_BUILD;
+    assert.equal(packagedAppName('global'), 'Cindy');
+  } finally {
+    if (previous === undefined) delete process.env.CINDY_RECLAUDE_BUILD;
+    else process.env.CINDY_RECLAUDE_BUILD = previous;
+  }
+});
 /**
  * 从源码里抽取形如 `<mapName>: Object.freeze({ cn: '...', ... })` 的区域映射。
  * 锚定到 `Object.freeze({` 赋值处:字段名可能还出现在 interface 声明里。

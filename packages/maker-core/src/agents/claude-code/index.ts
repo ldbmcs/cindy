@@ -4287,7 +4287,8 @@ export class ClaudeCodeAgent extends BaseAgent {
       // projectsRoot 按子进程实际可见的 CLAUDE_CONFIG_DIR 解析(SDK spawn 时
       // {...process.env, ...env} 合并,env 覆盖优先)。best-effort:已在位只花一次
       // stat,失败/缺失只记日志不阻断——CLI 找不到时仍按原行为报错。
-      if (resumeSdkSid && opts.workingDir) {
+      // ReClaude 自己管理转录目录；默认目录缺失不能证明它的会话已失效。
+      if (resumeSdkSid && opts.workingDir && path.basename(binaryPath ?? '') !== 'reclaude') {
         try {
           const claudeConfigDir =
             env.CLAUDE_CONFIG_DIR ??
