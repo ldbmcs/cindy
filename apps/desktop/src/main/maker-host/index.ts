@@ -150,6 +150,7 @@ import { invokeDeviceValue } from '../maker-ipc/orcaRemoteWorkers.js';
 import { createHistoryRemoteDeps } from '../mcp-integrations/historyDevices.js';
 import { WorktreePool } from '../worktree/index.js';
 import { getReadyBinaryPath, getCachedBinaryStatus } from '../agent-binaries/index.js';
+import { reclaudeValidationBinaryPath } from './claude-native-cli.js';
 import {
   ownerScopedUserDataPath,
 } from '../appSessionState.js';
@@ -1004,7 +1005,7 @@ export function getMaker(): Maker {
     makerStartupGate.assertComplete();
     // splash 已经 prepare 过, 这里只是同步读 cache 路径; 任一缺失说明 bootstrap
     // 顺序错了, 早抛比 session.start 时再炸更清晰。
-    const claudePath = getReadyBinaryPath('claude-code');
+    const claudePath = reclaudeValidationBinaryPath() ?? getReadyBinaryPath('claude-code');
     if (!claudePath) {
       throw new Error(
         'getMaker: Claude binary not provisioned (bootstrap must run agent-binaries.prepare("claude-code") before getMaker)',

@@ -22,5 +22,9 @@ export const CURRENT_CINDY_REGION: CindyRegion = resolveCindyRegion(
   import.meta.env?.VITE_CINDY_AUTH_REGION,
 );
 
+export const IS_RECLAUDE_BUILD = import.meta.env?.VITE_CINDY_RECLAUDE_BUILD === '1';
+
 /** 本构建的系统身份 id(Windows AUMID / macOS bundle id)。 */
-export const CURRENT_APP_ID: string = brandAppId(CURRENT_CINDY_REGION);
+export const CURRENT_APP_ID: string = IS_RECLAUDE_BUILD
+  ? 'io.github.ldbmcs.cindy-reclaude'
+  : brandAppId(CURRENT_CINDY_REGION);

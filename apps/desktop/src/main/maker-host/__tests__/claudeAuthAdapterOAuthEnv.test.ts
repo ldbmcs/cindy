@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
   retainPresentation: vi.fn(),
   readLoginCalls: [] as Array<{ maxAgeMs?: number } | undefined>,
   legacyMigrations: 0,
+  reclaudeBinary: undefined as string | undefined,
 }));
 
 vi.mock('../provider-presentation-store.js', () => ({
@@ -75,6 +76,7 @@ vi.mock('../claude-native-connection.js', () => ({
 
 vi.mock('../claude-native-cli.js', () => ({
   claudeCliNetworkEnv: async () => ({ ...h.networkEnv }),
+  reclaudeValidationBinaryPath: () => h.reclaudeBinary,
 }));
 
 vi.mock('../claude-legacy-config-migration.js', () => ({
@@ -134,6 +136,7 @@ const CREDENTIAL_KEYS = [
 
 describe('DesktopClaudeAuthAdapter — Claude 订阅只经 CLI 自己的登录', () => {
   beforeEach(() => {
+    h.reclaudeBinary = undefined;
     h.nativeLogin = true;
     h.bound = true;
     h.gatewayKey = 'sk-xd-gateway';
@@ -189,6 +192,15 @@ describe('DesktopClaudeAuthAdapter — Claude 订阅只经 CLI 自己的登录',
       expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
     }
     expect(h.legacyMigrations).toBe(optionsList.length);
+  });
+
+  // 独立验证只使用现有订阅，不把旧会话搬到用户原来的配置目录；原有用例未覆盖验证模式。
+  it('独立验证版使用已有订阅时不搬入旧会话，也不传入凭据', async () => {
+    h.reclaudeBinary = '/opt/reclaude';
+    h.gatewayKey = null;
+    const adapter = await makeAdapter();
+    await expect(adapter.getAuthEnv({ credentialMode: 'oauth-bearer' })).resolves.toEqual({});
+    expect(h.legacyMigrations).toBe(0);
   });
 
   it('订阅会话:未连接(CLI 未登录或 Cindy 未获许可)→ no_oauth', async () => {

@@ -40,8 +40,10 @@ export function resolveRegionUserDataDirName(input: {
   region: CindyRegion;
   argv: readonly string[];
   envUserDataDir?: string;
+  reclaude?: boolean;
 }): string | null {
   if (hasExplicitUserDataDir(input.argv)) return null;
+  if (input.isPackaged && input.reclaude) return 'CindyReClaude';
   const dirName = brandUserDataDirName(input.region);
   // 与 productName 默认派生目录同名(cn)→ 不覆写,走 Electron 原生路径。
   if (dirName === BRAND_IDENTITY.userDataDirName) return null;
