@@ -119,21 +119,24 @@ const unresolvedAliasLogged = new Set<string>();
  * SDK 条目 → 目录模型 id;无法确定时返回 null(该条目不进清单)。
  *
  * 显式 `claude-*` id 原样归一化。SDK 对每个系列的当前型号常只报简称
- * (`default` / `opus` / `sonnet` …),具体版本只写在 description 开头
- * (如 "Opus 5.5 · …" / "Opus 4.7 with 1M context · …")。简称按说明里的系列与版本
+ * (`default` / `opus` / `sonnet` …),具体版本写在 description 或 displayName 开头
+ * (如 "Opus 5.5 · …" / "Opus 4.7 with 1M context · …")。优先解析说明,无版本时再读名称。
+ * 简称按解析出的系列与版本
  * 拼出 `claude-<系列>-<主>-<次>`(Anthropic 的 id 规则)。目录尚未登记的新版本
  * (如 Fable 5.2)照样按说明生成 id 并显示,资料用未知模型的默认值,绝不映射到相邻旧版本。
- * 只有无法从说明确定版本时才放弃:简称与说明的系列不一致(opus 却写 Sonnet)、
- * 版本号多于两段或说明缺失。
+ * 简称与解析出的系列不一致(opus 却写 Sonnet),或两处均无可解析版本时放弃。
  */
-function resolveSdkModelId(value: string, description: unknown): string | null {
+function resolveSdkModelId(value: string, description: unknown, displayName: unknown): string | null {
   const normalized = normalizeModelId(value);
   if (normalized.startsWith('claude')) return normalized;
   const alias = normalized.toLowerCase();
-  const match =
-    typeof description === 'string'
-      ? /^(?:Claude\s+)?([A-Za-z]+)\s+(\d+)(?:\.(\d+))?(?![\w.])/.exec(description.trim())
-      : null;
+  const match = [description, displayName]
+    .map((text) =>
+      typeof text === 'string'
+        ? /^(?:Claude\s+)?([A-Za-z]+)\s+(\d+)(?:\.(\d+))?(?![\w.])/.exec(text.trim())
+        : null,
+    )
+    .find((match) => match !== null);
   const family = match?.[1]?.toLowerCase();
   const id =
     match && family && (alias === 'default' || alias === family)
@@ -260,7 +263,7 @@ function fallbackEffortBaseline(id: string): { efforts: Effort[]; defaultEffort:
 /**
  * SDK `supportedModels()` 条目 → 映射结果。只读目录,无副作用(除一次性日志)。
  * 目录只收显式版本 id(规则 10:禁止 opus/sonnet 裸别名进目录):SDK 简称条目经
- * resolveSdkModelId 按说明里的版本解析为具体 id,确定不了版本才跳过。这份清单是 Anthropic
+ * resolveSdkModelId 按说明或明确名称里的版本解析为具体 id,确定不了版本才跳过。这份清单是 Anthropic
  * 成员的唯一来源,目录不再补入 SDK 没返回的型号。
  * 名称:SDK 的 displayName 写出与 id 相同的版本号才采用;否则用目录名称,目录未登记则按 id 推导。
  * ModelInfo 的能力字段全部 optional:字段在场时 SDK 是能力权威(supportsEffort=false =
@@ -282,7 +285,7 @@ export function mapAnthropicSdkModels(raw: unknown): SdkMappedModel[] {
       supportsFastMode?: unknown;
     };
     if (typeof e.value !== 'string' || e.value.length === 0) continue;
-    const id = resolveSdkModelId(e.value, e.description);
+    const id = resolveSdkModelId(e.value, e.description, e.displayName);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const reportedName =

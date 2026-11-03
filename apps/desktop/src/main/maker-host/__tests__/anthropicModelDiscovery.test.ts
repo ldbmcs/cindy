@@ -301,11 +301,28 @@ describe('mapAnthropicSdkModels', () => {
     expect(out[4]!.model.discoveredMetadata?.name).toBe('Opus 4.5');
   });
 
+  /**
+   * 测试价值：mapAnthropicSdkModels 返回的清单须同时保留新版与旧版型号。
+   * Bug：Claude Code 2.1.312 把 Fable 5.1 的版本写在名称中，描述只有用途。
+   * 现有缺口：简称解析只覆盖描述含版本；最小输入为新版简称与旧版显式 id。
+   * tier：unit，直接调用映射入口，不访问 CLI、账号或网络。
+   */
+  it('名称含版本而描述没有版本时，清单同时保留 Fable 5.1 和旧 Fable 5', () => {
+    const out = mapAnthropicSdkModels([
+      { value: 'fable', displayName: 'Fable 5.1', description: 'For your toughest challenges' },
+      { value: 'claude-fable-5', displayName: 'Fable 5', description: 'Most capable for your hardest and longest-running tasks' },
+    ]);
+    expect(out.map(({ model }) => [model.id, model.name])).toEqual([
+      ['claude-fable-5-1', 'Fable 5.1'],
+      ['claude-fable-5', 'Fable 5'],
+    ]);
+  });
+
   it('目录未登记的新版本照样显示,id 与名称按说明里的版本生成(Fable 5.2 不被显示成 5.1)', () => {
     setActiveCatalog(BUNDLED_CATALOG);
     const out = mapAnthropicSdkModels([
       // 简称指向目录还不认识的 5.2:按说明生成 claude-fable-5-2,不映射到已登记的 5.1。
-      { value: 'fable', displayName: 'Fable', description: 'Fable 5.2 · Newest' },
+      { value: 'fable', displayName: 'Fable 5.1', description: 'Fable 5.2 · Newest' },
       { value: 'claude-fable-5-1', displayName: 'Fable', description: 'Fable 5.1 · Previous' },
     ]);
     expect(out.map(({ model }) => [model.id, model.name])).toEqual([
@@ -338,10 +355,10 @@ describe('mapAnthropicSdkModels', () => {
     expect(out.every(({ model }) => model.discoveredMetadata?.name === undefined)).toBe(true);
   });
 
-  it('简称与说明的系列不符、版本多于两段或缺说明时放弃,不猜', () => {
+  it('简称与说明的系列不符、版本多于两段或没有可确定版本时放弃,不猜', () => {
     setActiveCatalog(BUNDLED_CATALOG);
     const out = mapAnthropicSdkModels([
-      { value: 'opus', displayName: 'Opus', description: 'Sonnet 5 · Best for everyday tasks' },
+      { value: 'opus', displayName: 'Opus 5.5', description: 'Sonnet 5 · Best for everyday tasks' },
       { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 5.0.1 · Patch' },
       { value: 'haiku', displayName: 'Haiku' },
       { value: 'opusplan', displayName: 'Opus Plan', description: 'Opus 5.5 in plan mode' },
